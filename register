@@ -1,0 +1,60 @@
+import uvicorn
+from fastapi import FastAPI
+from pydantic import BaseModel
+import config
+import json
+import pyodbc
+import py_functions
+
+def connect_db(pwd):
+    driver = config.DRIVER
+    server = config.SERVER
+    database = config.DATABASE
+    uid  = config.UID
+    pwd = pwd
+    trust = config.TRUST
+    con_string = f'DRIVER={driver};SERVER={server};DATABASE={database};UID={uid};PWD={pwd}'
+    cnxn = pyodbbc.connection(con_string)
+    cnxn.autocommit = True
+    cursor = cnxn.cursor()
+    print("Connection Successful with database")
+    return cnxn,cursor
+
+
+with open('SQL/Password.json') as f:
+    # {"password": "xyz"}
+    data = json.load(f)
+pwd=data['Password']
+
+cnxn,cursor = connect_db(pwd)
+
+@app.get('/')
+def get_data(search:str = ""):
+    df = py_functions.fetch_data(search,cnxn)
+    return df.to_dict('r')
+
+class UserRegistration(BaseModel):
+    Name: str
+    Email: str
+    PhoneNumber: str
+    Password: str
+
+app = FastAPI()
+
+@app.post("/register")
+def register(Name:str,Email:str,PhoneNumber:str,Password:str):
+    if '@gmail.com' not in email:
+        return {"Email ID Invalid"}
+    user_exist = py_functions.check_user_exist(Email,cnxn)
+    if user_exist==0:
+        register_MySQL = py_functions.register_data(Name,Email,PhoneNumber,Password)
+        cursor.execute(register_MySQL)
+        return {"status":"Register please login with same creds."}
+    else:
+        return {"status":'Email id already used.'}
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="localhost", port=8000)
+
+
